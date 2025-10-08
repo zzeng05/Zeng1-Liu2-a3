@@ -23,19 +23,101 @@ The ultimate goal is to gather the table "Historical population" and convert it 
 
 As a first step, read in the html page as an R object. Extract the tables from this object (using the `rvest` package) and save the result as a new object. Follow the instructions if there is an error. Use `str()` on this new object -- it should be a list. Try to find the position of the "Historical population" in this list since we need it in the next step.
 
+```{r}
+# read in the html page
+GB <- read_html("https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago")
+str(GB)
+```
+
+```{r}
+# Find the position of the "Historical population"
+GB_tables <- GB %>%
+  html_elements("table") %>%
+  html_table(fill = TRUE)
+
+str(GB_tables)
+```
+
+```{r}
+GB_tables[[1]]
+GB_tables[[2]]
+GB_tables[[3]]
+GB_tables[[4]]
+GB_tables[[5]]
+# table 2 is historical population
+```
+
 Extract the "Historical population" table from the list and save it as another object. You can use subsetting via `[[…]]` to extract pieces from a list. Print the result.
 
+```{r}
+hist_pop <- GB_tables[[2]]
+print(hist_pop)
+```
+
 You will see that the table needs some additional formatting. Keep only want rows and columns with actual values.
+
+```{r}
+colnames(hist_pop)
+hist_pop_cleaned <- hist_pop %>% 
+  select(Census, Pop., `%±`)
+
+head(hist_pop_cleaned)
+```
 
 ## Expanding to More Pages
 
 That's it for this page. However, we may want to repeat this process for other community areas. The Wikipedia page <https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago> has a section on "Places adjacent to Grand Boulevard, Chicago" at the bottom. Can you find the corresponding table in the list of tables that you created earlier? Extract this table as a new object.
 
+```{r}
+GB_tables[[3]]
+GB_adjacent <- GB_tables[[3]]
+```
+
 Then, grab the community areas east of Grand Boulevard and save them as a character vector. Print the result.
+
+```{r}
+# flatten all table entries into one vector
+GB_adjacent_vec <- unlist(GB_adjacent)
+
+# remove NAs and clean text
+GB_adjacent_vec <- GB_adjacent_vec[!is.na(GB_adjacent_vec)]
+GB_adjacent_vec <- trimws(GB_adjacent_vec)
+
+# show unique names
+unique(GB_adjacent_vec)
+```
+
+```{r}
+# Example if one column corresponds to the east side:
+east_of_GB <- GB_adjacent_vec[grepl("Kenwood", GB_adjacent_vec)]
+print(east_of_GB)
+
+```
 
 We want to use this list to create a loop that extracts the population tables from the Wikipedia pages of these places. To make this work and build valid urls, we need to replace empty spaces in the character vector with underscores. The resulting vector should look like this: "Oakland,\_Chicago" "Kenwood,\_Chicago" "Hyde_Park,\_Chicago"
 
+```{r}
+
+```
+
 Build a loop to grab the population tables from each page. Add columns to the original table using `cbind()`.
+
+```{r}
+for(i in 1:npages) {
+  url <- paste0("https://www.niche.com/colleges/search/best-colleges/?page=",i, sep = "")
+  src <- read_html(url)
+  print(url)
+  
+  nds <- html_nodes(src, xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "search-result__title", " " ))]')
+  names <- html_text(nds)
+  
+  nds2 <- html_nodes(src, xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "search-result-fact-list__item", " " ))]')
+  stats <- html_text(nds2)
+  stats_dat <- as.data.frame(matrix(stats, ncol = 4, byrow = T))
+
+  part <- data.frame(names, stats_dat)
+  colleges <- rbind(colleges, part)
+```
 
 ## Scraping and Analyzing Text Data
 
@@ -47,7 +129,15 @@ First, scrape just the text without any of the information in the margins or hea
 # description <- description %>% paste(collapse = ' ')
 ```
 
+```{r}
+
+```
+
 Using a similar loop as in the last section, grab the descriptions of the various communities areas. Make a tibble with two columns: the name of the location and the text describing the location.
+
+```{r}
+
+```
 
 Let's clean the data using `tidytext`. If you have trouble with this section, see the example shown in <https://www.tidytextmining.com/tidytext.html>
 
@@ -57,4 +147,12 @@ library(tidytext)
 
 Create tokens using `unnest_tokens`. Make sure the data is in one-token-per-row format. Remove any stop words within the data. What are the most common words used overall?
 
+```{r}
+
+```
+
 Plot the most common words within each location. What are some of the similarities between the locations? What are some of the differences?
+
+```{r}
+
+```
