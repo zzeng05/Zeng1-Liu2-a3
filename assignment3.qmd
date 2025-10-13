@@ -1,6 +1,7 @@
 ---
 title: "Assignment 3"
 subtitle: "Due at 11:59pm on October 14."
+author: "Troy (Shengkun) Liu & Zupeng Zeng"
 format: pdf
 editor: visual
 ---
@@ -76,7 +77,7 @@ GB_adjacent <- GB_tables[[3]]
 Then, grab the community areas east of Grand Boulevard and save them as a character vector. Print the result.
 
 ```{r}
-# flatten all table entries into one vector
+# flatten all table entries
 GB_adjacent_vec <- unlist(GB_adjacent)
 
 # remove NAs and clean text
@@ -91,13 +92,24 @@ unique(GB_adjacent_vec)
 # Example if one column corresponds to the east side:
 east_of_GB <- GB_adjacent_vec[grepl("Kenwood", GB_adjacent_vec)]
 print(east_of_GB)
-
 ```
 
 We want to use this list to create a loop that extracts the population tables from the Wikipedia pages of these places. To make this work and build valid urls, we need to replace empty spaces in the character vector with underscores. The resulting vector should look like this: "Oakland,\_Chicago" "Kenwood,\_Chicago" "Hyde_Park,\_Chicago"
 
 ```{r}
+## Pick the "East" neighbors as text, then make URL slugs like "Kenwood,_Chicago"
+east_col <- which(grepl("east", names(GB_adjacent), ignore.case = TRUE))
 
+if (length(east_col) == 1) {
+  east_of_GB <- unique(na.omit(GB_adjacent[[east_col]]))
+} else {
+  # fallback: use your flattened vector and keep likely east neighbors
+  east_of_GB <- unique(GB_adjacent_vec)
+  east_of_GB <- east_of_GB[!grepl("Grand Boulevard|Chicago|^\\s*$", east_of_GB)]
+}
+
+east_pages <- paste0(gsub(" ", "_", east_of_GB), ",_Chicago")
+east_pages
 ```
 
 Build a loop to grab the population tables from each page. Add columns to the original table using `cbind()`.
@@ -126,17 +138,46 @@ Suppose we wanted to take the actual text from the Wikipedia pages instead of ju
 First, scrape just the text without any of the information in the margins or headers. For example, for "Grand Boulevard", the text should start with, "**Grand Boulevard** on the [South Side](https://en.wikipedia.org/wiki/South_Side,_Chicago "South Side, Chicago") of [Chicago](https://en.wikipedia.org/wiki/Chicago "Chicago"), [Illinois](https://en.wikipedia.org/wiki/Illinois "Illinois"), is one of the ...". Make sure all of the text is in one block by using something like the code below (I called my object `description`).
 
 ```{r}
-# description <- description %>% paste(collapse = ' ')
+#description <- description %>% paste(collapse = ' ')
 ```
 
 ```{r}
+# Grand Boulevard page text (single block)
+GB_url <- "https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago"
 
+description <- read_html(GB_url) %>%
+  html_element("#mw-content-text") %>%      # main content area
+  html_elements("p") %>%                    # paragraphs only
+  html_text2() %>%                          # clean text
+  paste(collapse = " ")                     # one big block
+
+description
 ```
 
 Using a similar loop as in the last section, grab the descriptions of the various communities areas. Make a tibble with two columns: the name of the location and the text describing the location.
 
 ```{r}
+# helper to fetch body text from a given Wikipedia slug
+get_description <- function(title_slug) {
+  url <- paste0("https://en.wikipedia.org/wiki/", title_slug)
+  txt <- read_html(url) %>%
+    html_element("#mw-content-text") %>%
+    html_elements("p") %>%
+    html_text2() %>%
+    paste(collapse = " ")
 
+  tibble(
+    place = gsub(",_Chicago", "", gsub("_", " ", title_slug)),
+    text  = txt
+  )
+}
+
+# list of pages to fetch
+pages <- c("Grand_Boulevard,_Chicago", "Kenwood,_Chicago", "Oakland,_Chicago", "Hyde_Park,_Chicago")
+
+
+descriptions <- bind_rows(lapply(pages, get_description))
+descriptions
 ```
 
 Let's clean the data using `tidytext`. If you have trouble with this section, see the example shown in <https://www.tidytextmining.com/tidytext.html>
@@ -148,11 +189,37 @@ library(tidytext)
 Create tokens using `unnest_tokens`. Make sure the data is in one-token-per-row format. Remove any stop words within the data. What are the most common words used overall?
 
 ```{r}
+tokens <- descriptions %>%
+  unnest_tokens(word, text) %>%            # one-token-per-row
+  anti_join(stop_words, by = "word") %>%   # remove stop words
+  filter(!grepl("^[0-9]+$", word))         # drop pure numbers
 
+# overall top words
+top <- tokens %>%
+  count(word, sort = TRUE) %>%
+  slice_head(n = 20)
+top
 ```
 
 Plot the most common words within each location. What are some of the similarities between the locations? What are some of the differences?
 
 ```{r}
+# counts per place
+per_place <- tokens |>
+  count(place, word, sort = TRUE)
 
+# top 10 words per place
+top10_per_place <- per_place |>
+  group_by(place) |>
+  slice_max(n, n = 10, with_ties = FALSE) |>
+  ungroup()
+
+ggplot(top10_per_place,
+       aes(x = n, y = reorder_within(word, n, place))) +
+  geom_col() +
+  facet_wrap(~ place, scales = "free_y") +
+  tidytext::scale_y_reordered() +
+  labs(title = "Top words per location",
+       x = "Count", y = "Word") +
+  theme_minimal()
 ```
