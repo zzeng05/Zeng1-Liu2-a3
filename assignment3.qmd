@@ -14,6 +14,8 @@ library(rvest)
 library(tidyverse)
 ```
 
+- Working Repo could be found at: https://github.com/zzeng05/Zeng1-Liu2-a3.git
+
 ## Web Scraping
 
 In this assignment, your task is to scrape some information from Wikipedia. We start with the following page about Grand Boulevard, a Chicago Community Area.
@@ -44,8 +46,9 @@ GB_tables[[4]]
 GB_tables[[5]]
 GB_tables[[6]]
 GB_tables[[7]]
-# table 2 is historical population
 ```
+
+- table 2 is the historical population
 
 Extract the "Historical population" table from the list and save it as another object. You can use subsetting via `[[…]]` to extract pieces from a list. Print the result.
 
@@ -79,7 +82,7 @@ GB_adjacent <- GB_tables[[3]]
 Then, grab the community areas east of Grand Boulevard and save them as a character vector. Print the result.
 
 ```{r}
-GB_east <- GB_adjacent[[3]] [-1] %>% # Third colum is for east except in first row
+GB_east <- GB_adjacent[[3]] [-1] %>% # Third column is for east except in first row
   discard(~ .x == "")          # drop empty strings
 
 print(GB_east)
@@ -146,10 +149,10 @@ First, scrape just the text without any of the information in the margins or hea
 GB_url <- "https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago"
 
 description <- read_html(GB_url) %>%
-  html_element("#mw-content-text") %>%      # main content area
+  html_element("#mw-content-text") %>%      # main content
   html_elements("p") %>%                    # paragraphs only
   html_text2() %>%                          # clean text
-  paste(collapse = " ")                     # one big block
+  paste(collapse = " ")                     # in one block
 
 description
 ```
@@ -157,7 +160,7 @@ description
 Using a similar loop as in the last section, grab the descriptions of the various communities areas. Make a tibble with two columns: the name of the location and the text describing the location.
 
 ```{r}
-# helper to fetch body text from a given Wikipedia slug
+# function to fetch body text from a given Wikipedia slug
 get_description <- function(title_slug) {
   url <- paste0("https://en.wikipedia.org/wiki/", title_slug)
   txt <- read_html(url) %>%
@@ -165,7 +168,6 @@ get_description <- function(title_slug) {
     html_elements("p") %>%
     html_text2() %>%
     paste(collapse = " ")
-
   tibble(
     place = gsub(",_Chicago", "", gsub("_", " ", title_slug)),
     text  = txt
@@ -174,7 +176,6 @@ get_description <- function(title_slug) {
 
 # list of pages to fetch
 pages <- unique(c("Grand_Boulevard,_Chicago", GB_east_urls))
-
 
 descriptions <- bind_rows(lapply(pages, get_description))
 descriptions
@@ -190,25 +191,24 @@ Create tokens using `unnest_tokens`. Make sure the data is in one-token-per-row 
 
 ```{r}
 tokens <- descriptions %>%
-  unnest_tokens(word, text) %>%            # one-token-per-row
+  unnest_tokens(word, text) %>%            # sort into one token per row
   anti_join(stop_words, by = "word") %>%   # remove stop words
   filter(!grepl("^[0-9]+$", word))         # drop pure numbers
 
-# overall top words
-top <- tokens %>%
+# overall top 20 words
+tokens %>%
   count(word, sort = TRUE) %>%
   slice_head(n = 20)
-top
 ```
 
 Plot the most common words within each location. What are some of the similarities between the locations? What are some of the differences?
 
 ```{r}
-# counts per place
+# counts by place
 per_place <- tokens |>
   count(place, word, sort = TRUE)
 
-# top 10 words per place
+# top 10 words by place
 top10_per_place <- per_place |>
   group_by(place) |>
   slice_max(n, n = 10, with_ties = FALSE) |>
@@ -219,7 +219,7 @@ ggplot(top10_per_place,
   geom_col() +
   facet_wrap(~ place, scales = "free_y") +
   tidytext::scale_y_reordered() +
-  labs(title = "Top words per location",
+  labs(title = "Top words by location",
        x = "Count", y = "Word") +
   theme_minimal()
 ```
