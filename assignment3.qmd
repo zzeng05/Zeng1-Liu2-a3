@@ -1,7 +1,7 @@
 ---
 title: "Assignment 3"
 subtitle: "Due at 11:59pm on October 14."
-format: html
+format: pdf
 editor: visual
 Author: Zupeng Zeng, Troy Liu
 ---
